@@ -1,130 +1,368 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mapa interactivo</title>
-
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MAPA INTERACTIVO · SIEI</title>
 <style>
-body{
-  font-family:Arial,Helvetica,sans-serif;
-  background:#0f172a;
-  color:white;
-  text-align:center;
-  margin:0;
-}
+  :root{
+    --bg:#0f172a;
+    --panel:#0b1224;
+    --ink:#ffffff;
+    --muted:#cbd5e1;
+    --overlay: rgba(0,0,0,.65);
+    --green:#22c55e;
+    --blue:#60a5fa;
+    --amber:#f59e0b;
+  }
+  body{
+    margin:0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    text-align:center;
+  }
+  h1{ margin:12px; font-size:22px; }
 
-h1{margin:12px;font-size:22px}
+  #contenedor{
+    position:relative;
+    width:95%;
+    max-width:900px;
+    margin: 0 auto 18px;
+  }
+  #mapa{
+    width:100%;
+    height:auto;
+    display:block;
+    border-radius:14px;
+  }
 
-#contenedor{
-  position:relative;
-  width:95%;
-  max-width:900px;
-  margin:auto;
-}
+  /* ZONAS CLICABLES */
+  .zona{
+    position:absolute;
+    border-radius:12px;
+    background: rgba(255,255,255,0.00); /* invisible */
+    pointer-events: none; /* se activan por JS */
+  }
 
-#mapa{
-  width:100%;
-  display:block;
-  border-radius:14px;
-}
+  /* Cuando una zona es la que toca (señalada) */
+  .zona.active{
+    pointer-events: auto;
+    outline: 4px solid var(--green);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgba(34,197,94,.25);
+    animation: pulse 1.1s infinite;
+    cursor: pointer;
+  }
 
-/* zonas clicables */
-.zona{
-  position:absolute;
-  cursor:pointer;
-  border-radius:12px;
-}
+  /* Variantes de color por paso */
+  .zona.active.entrada{
+    outline-color: var(--blue);
+    box-shadow: 0 0 0 6px rgba(96,165,250,.25);
+  }
+  .zona.active.pistas{
+    outline-color: var(--amber);
+    box-shadow: 0 0 0 6px rgba(245,158,11,.25);
+  }
 
-/* feedback */
-#mensaje{
-  margin-top:12px;
-  font-size:22px;
-  font-weight:bold;
-  min-height:30px;
-}
-.correcto{color:#22c55e}
-.error{color:#ef4444}
+  @keyframes pulse{
+    0%{ transform: scale(1); }
+    50%{ transform: scale(1.01); }
+    100%{ transform: scale(1); }
+  }
 
+  /* POPUP (MODAL) */
+  #overlay{
+    position:fixed;
+    inset:0;
+    background: var(--overlay);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 18px;
+    z-index: 50;
+  }
+  #overlay.hidden{ display:none; }
+
+  #popup{
+    width:min(720px, 100%);
+    background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 18px;
+    box-shadow: 0 16px 40px rgba(0,0,0,.45);
+    padding: 18px;
+    text-align:left;
+  }
+
+  #popupText{
+    font-size: 18px;
+    line-height: 1.35;
+    font-weight: 800;
+    letter-spacing: .3px;
+    margin: 0 0 14px;
+    text-transform: uppercase; /* TODO EN MAYÚSCULAS */
+    color: var(--ink);
+  }
+
+  .btnRow{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+  button{
+    border:0;
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-weight: 900;
+    cursor:pointer;
+    background: rgba(255,255,255,.10);
+    color: var(--ink);
+  }
+  button:hover{ background: rgba(255,255,255,.14); }
+  button.primary{
+    background: rgba(34,197,94,.85);
+    color: #062012;
+  }
+  button.primary:hover{ background: rgba(34,197,94,.95); }
+  button.play{
+    background: rgba(255,255,255,.12);
+  }
+  button[disabled]{
+    opacity:.45;
+    cursor:not-allowed;
+  }
+
+  /* etiqueta pequeña arriba */
+  .chip{
+    display:inline-block;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.10);
+    border: 1px solid rgba(255,255,255,.12);
+    color: var(--muted);
+    font-weight: 900;
+    font-size: 12px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  #nota{
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 8px;
+  }
 </style>
 </head>
 
 <body>
-
-<h1 id="objetivo">Encuentra: PISTAS DEPORTIVAS</h1>
+<h1>MAPA INTERACTIVO</h1>
 
 <div id="contenedor">
-  <img src="mapa.jpg" id="mapa">
+  <!-- IMPORTANTE: pon aquí tu imagen LIMPIA -->
+  <img src="mapa.jpg" id="mapa" alt="Mapa del instituto" />
 
-  <!-- ZONA 1 PISTAS -->
-  <div class="zona" data-lugar="pistas"
+  <!-- 1) PISTAS (NO TOCAR) -->
+  <div class="zona" id="zPistas" data-lugar="pistas"
        style="left:6%;top:18%;width:42%;height:32%"></div>
 
-  <!-- ZONA 2 ENTRADA -->
-  <div class="zona" data-lugar="entrada"
+  <!-- 2) ENTRADA (NO TOCAR) -->
+  <div class="zona" id="zEntrada" data-lugar="entrada"
        style="left:45%;top:66%;width:10%;height:22%"></div>
 
-  <!-- ZONA 3 CLASE -->
-  <div class="zona" data-lugar="clase"
-     style="left:53.4%;top:69.6%;width:6.5%;height:11.7%"></div>
+  <!-- 3) CLASE (CORREGIDA) -->
+  <div class="zona" id="zClase" data-lugar="clase"
+       style="left:53.4%;top:69.6%;width:6.5%;height:11.7%"></div>
 </div>
 
-<div id="mensaje"></div>
+<!-- POPUP -->
+<div id="overlay">
+  <div id="popup" role="dialog" aria-modal="true" aria-label="Instrucciones">
+    <div class="chip" id="chip">INSTRUCCIÓN</div>
+    <p id="popupText"></p>
+    <p id="nota">PULSA ▶ PARA ESCUCHAR EL TEXTO.</p>
+    <div class="btnRow">
+      <button class="play" id="btnPlay">▶ PLAY</button>
+      <button class="primary" id="btnContinue" style="display:none;">CONTINUAR</button>
+    </div>
+  </div>
+</div>
 
 <script>
-const objetivos=["pistas","entrada","clase"];
-let actual=0;
+  // -----------------------
+  // TEXT TO SPEECH (TTS)
+  // -----------------------
+  function speak(text){
+    try{
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "es-ES";
+      u.rate = 0.92;
+      u.pitch = 1.0;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
 
-function hablar(texto){
-  speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(texto);
-  u.lang="es-ES";
-  speechSynthesis.speak(u);
-}
+  // -----------------------
+  // UI helpers
+  // -----------------------
+  const overlay = document.getElementById("overlay");
+  const popupTextEl = document.getElementById("popupText");
+  const chipEl = document.getElementById("chip");
+  const btnPlay = document.getElementById("btnPlay");
+  const btnContinue = document.getElementById("btnContinue");
 
-function cambiarObjetivo(){
-  const nombres={
-    pistas:"PISTAS DEPORTIVAS",
-    entrada:"ENTRADA",
-    clase:"CLASE"
-  };
-  document.getElementById("objetivo").textContent=
-  "Encuentra: "+nombres[objetivos[actual]];
-  hablar(nombres[objetivos[actual]]);
-}
+  const zClase = document.getElementById("zClase");
+  const zEntrada = document.getElementById("zEntrada");
+  const zPistas = document.getElementById("zPistas");
 
-document.querySelectorAll(".zona").forEach(z=>{
-  z.onclick=()=>{
-    const elegido=z.dataset.lugar;
-    const mensaje=document.getElementById("mensaje");
+  function setActiveZone(zoneName){
+    // limpiar
+    [zClase, zEntrada, zPistas].forEach(z=>{
+      z.classList.remove("active","entrada","pistas");
+      z.style.pointerEvents = "none";
+    });
 
-    if(elegido===objetivos[actual]){
-      mensaje.textContent="¡BIEN!";
-      mensaje.className="correcto";
-      hablar("muy bien");
-
-      actual++;
-      if(actual>=objetivos.length){
-        setTimeout(()=>{
-          mensaje.textContent="ACTIVIDAD TERMINADA";
-          hablar("actividad terminada");
-        },800);
-      }else{
-        setTimeout(()=>{
-          mensaje.textContent="";
-          cambiarObjetivo();
-        },900);
-      }
+    // activar solo la que toca
+    if(zoneName === "clase"){
+      zClase.classList.add("active");
+      zClase.style.pointerEvents = "auto";
+    }else if(zoneName === "entrada"){
+      zEntrada.classList.add("active","entrada");
+      zEntrada.style.pointerEvents = "auto";
+    }else if(zoneName === "pistas"){
+      zPistas.classList.add("active","pistas");
+      zPistas.style.pointerEvents = "auto";
     }else{
-      mensaje.textContent="Prueba otra vez";
-      mensaje.className="error";
-      hablar("prueba otra vez");
+      // ninguna activa (p.ej. pantallas de refuerzo)
     }
-  };
-});
+  }
 
-cambiarObjetivo();
+  function showPopup(text, {showContinue=false, chip="INSTRUCCIÓN"} = {}){
+    const t = (text || "").toUpperCase();
+    popupTextEl.textContent = t;
+    chipEl.textContent = chip.toUpperCase();
+    btnContinue.style.display = showContinue ? "inline-block" : "none";
+    overlay.classList.remove("hidden");
+    // no auto-voz; SOLO con PLAY, como pediste
+  }
+
+  function hidePopup(){
+    overlay.classList.add("hidden");
+  }
+
+  let currentPopupText = "";
+
+  function setPopup(text, opts){
+    currentPopupText = (text || "").toUpperCase();
+    showPopup(currentPopupText, opts);
+  }
+
+  btnPlay.addEventListener("click", () => {
+    if(!currentPopupText) return;
+    speak(currentPopupText);
+  });
+
+  // -----------------------
+  // SECUENCIA (ESCENAS)
+  // -----------------------
+  const scenes = [
+    {
+      id: "intro_clase",
+      active: "clase",
+      popup: "ESTO ES TU INSTITUTO VISTO DESDE EL CIELO.\nTU CLASE ESTÁ MARCADA CON UN CUADRADO VERDE.\n¿PUEDES HACER CLICK SOBRE EL CUADRADO DONDE ESTÁ TU CLASE?",
+      continue: false,
+      chip: "PASO 1"
+    },
+    {
+      id: "refuerzo_clase",
+      active: null,
+      popup: "¡MUY BIEN! ESO ERA TU CLASE.",
+      continue: true,
+      chip: "BIEN"
+    },
+    {
+      id: "intro_entrada",
+      active: "entrada",
+      popup: "AHORA VAMOS A SALIR DEL INSTITUTO.\nLA ENTRADA PRINCIPAL ESTÁ MARCADA.\n¿PUEDES HACER CLICK EN LA ENTRADA?",
+      continue: false,
+      chip: "PASO 2"
+    },
+    {
+      id: "refuerzo_entrada",
+      active: null,
+      popup: "¡PERFECTO! POR AQUÍ ENTRAS CADA DÍA.",
+      continue: true,
+      chip: "BIEN"
+    },
+    {
+      id: "intro_pistas",
+      active: "pistas",
+      popup: "AHORA BUSCA LAS PISTAS DEPORTIVAS.\nSON UN LUGAR GRANDE PARA HACER DEPORTE.\n¿PUEDES HACER CLICK EN LAS PISTAS?",
+      continue: false,
+      chip: "PASO 3"
+    },
+    {
+      id: "final",
+      active: null,
+      popup: "¡GENIAL!\nHAS ENCONTRADO CLASE, ENTRADA Y PISTAS.\nESTO ES UN MAPA: TE AYUDA A ORIENTARTE VISTO DESDE ARRIBA.",
+      continue: true,
+      chip: "FINAL"
+    }
+  ];
+
+  let i = 0;
+
+  function renderScene(){
+    const s = scenes[i];
+    setActiveZone(s.active);
+    setPopup(s.popup, {showContinue: s.continue, chip: s.chip});
+  }
+
+  function nextScene(){
+    i = Math.min(i + 1, scenes.length - 1);
+    renderScene();
+  }
+
+  btnContinue.addEventListener("click", () => {
+    // si estamos en final, reiniciar o cerrar
+    if(scenes[i].id === "final"){
+      // reinicia a paso 1 (puedes cambiarlo por "cerrar" si quieres)
+      i = 0;
+      renderScene();
+      return;
+    }
+    nextScene();
+  });
+
+  // -----------------------
+  // CLICK en ZONAS (solo cuando toca)
+  // -----------------------
+  function onZoneClick(name){
+    const s = scenes[i];
+
+    // Solo reaccionar cuando la escena pide un clic
+    if(!s.active) return;
+
+    // Solo vale la zona correcta (las demás ni tienen pointer-events)
+    if(s.active === name){
+      // Pasar al refuerzo correspondiente
+      if(name === "clase" && s.id === "intro_clase"){
+        i = 1; renderScene();
+      }else if(name === "entrada" && s.id === "intro_entrada"){
+        i = 3; renderScene();
+      }else if(name === "pistas" && s.id === "intro_pistas"){
+        i = 5; renderScene();
+      }
+    }
+  }
+
+  zClase.addEventListener("click", () => onZoneClick("clase"));
+  zEntrada.addEventListener("click", () => onZoneClick("entrada"));
+  zPistas.addEventListener("click", () => onZoneClick("pistas"));
+
+  // START
+  renderScene();
 </script>
-
 </body>
 </html>
