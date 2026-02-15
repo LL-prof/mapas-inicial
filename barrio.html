@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BARRIO · MAPA INTERACTIVO · SIEI</title>
+
+<style>
+  :root{
+    --bg:#0f172a;
+    --ink:#ffffff;
+    --muted:#cbd5e1;
+    --line:rgba(255,255,255,.14);
+    --shadow: 0 14px 40px rgba(0,0,0,.45);
+    --radius: 18px;
+
+    --green:#22c55e;
+    --red:#ef4444;
+    --redDark:#7f1d1d;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: radial-gradient(1200px 800px at 10% 10%, #1a2a6a 0%, var(--bg) 55%) fixed;
+    color: var(--ink);
+  }
+
+  .app{ max-width:1200px; margin:0 auto; padding:14px; }
+
+  /* RESPONSIVE LAYOUT */
+  .layout{
+    display:grid;
+    grid-template-columns:380px 1fr;
+    gap:14px;
+    align-items:start;
+  }
+  @media (max-width:920px){
+    .layout{ grid-template-columns:1fr; }
+  }
+
+  .card{
+    background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+
+  /* LEFT: INSTRUCTIONS */
+  .left{ padding:16px; }
+
+  .chip{
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.12);
+    color:var(--muted);
+    font-weight:900;
+    font-size:12px;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+
+  .title{
+    margin:0 0 10px;
+    font-size:18px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.4px;
+  }
+
+  #instrText{
+    margin:0 0 14px;
+    font-size:18px;
+    line-height:1.35;
+    font-weight:900;
+    letter-spacing:.3px;
+    text-transform:uppercase;
+    white-space:pre-line;
+  }
+
+  .note{
+    margin:0 0 12px;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.35;
+    text-transform:uppercase;
+    letter-spacing:.2px;
+  }
+
+  .btnRow{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+
+  button{
+    border:0;
+    border-radius:14px;
+    padding:12px 14px;
+    font-weight:900;
+    cursor:pointer;
+    background:rgba(255,255,255,.10);
+    color:var(--ink);
+    text-transform:uppercase;
+    letter-spacing:.3px;
+  }
+  button:hover{ background:rgba(255,255,255,.14); }
+
+  button.primary{
+    background: rgba(34,197,94,.88);
+    color:#061f12;
+  }
+  button.primary:hover{ background: rgba(34,197,94,.98); }
+
+  /* RIGHT: MAP */
+  .right{ padding:14px; }
+  .mapWrap{ position:relative; width:100%; }
+  #mapa{
+    width:100%;
+    height:auto;
+    display:block;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.10);
+  }
+
+  /* HOTSPOTS */
+  .zona{
+    position:absolute;
+    border-radius:12px;
+    background: rgba(255,255,255,0.00); /* invisible */
+    pointer-events:none;
+  }
+
+  /* INSTITUTO: SIEMPRE VISIBLE (REFERENCIA) */
+  #zInstituto{
+    background: rgba(239,68,68,.92); /* rojo sólido */
+    border: 2px solid rgba(255,255,255,.85);
+    box-shadow: 0 10px 24px rgba(0,0,0,.35), 0 0 0 6px rgba(239,68,68,.18);
+    pointer-events:none; /* se activa solo en el paso 1 */
+  }
+
+  /* Cuando TOCA clicar el instituto (paso 1) */
+  #zInstituto.activeRef{
+    pointer-events:auto;
+    cursor:pointer;
+    animation: pulseRef 1.1s infinite;
+  }
+
+  @keyframes pulseRef{
+    0%{ transform: scale(1); }
+    50%{ transform: scale(1.03); }
+    100%{ transform: scale(1); }
+  }
+</style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="layout">
+      <!-- LEFT PANEL -->
+      <section class="card left" aria-label="Instrucciones">
+        <div class="chip" id="chip">BARRIO · PASO 1</div>
+        <h1 class="title">INSTRUCCIONES</h1>
+
+        <p id="instrText"></p>
+        <p class="note" id="note">PULSA ▶ PLAY PARA ESCUCHAR.</p>
+
+        <div class="btnRow">
+          <button id="btnPlay">▶ PLAY</button>
+          <button class="primary" id="btnContinue" style="display:none;">CONTINUAR</button>
+        </div>
+      </section>
+
+      <!-- RIGHT PANEL -->
+      <section class="card right" aria-label="Mapa">
+        <div class="mapWrap" id="contenedor">
+          <!-- ✅ Usa la imagen LIMPIA del barrio y llámala barrio.jpg -->
+          <img src="barrio.jpg" id="mapa" alt="Mapa del barrio" />
+
+          <!-- 1) INSTITUTO (SIEMPRE MARCADO EN ROJO SÓLIDO) -->
+          <div class="zona" id="zInstituto"
+               style="left:37.1%;top:1.8%;width:6.2%;height:16.7%"></div>
+
+          <!-- 2) OFICINAS (INVISIBLE, SOLO CLICABLE CUANDO TOCA) -->
+          <div class="zona" id="zOficinas"
+               style="left:37.4%;top:74.4%;width:18.8%;height:21.8%"></div>
+
+          <!-- 3) MAR (INVISIBLE, SOLO CLICABLE CUANDO TOCA) -->
+          <div class="zona" id="zMar"
+               style="left:78.9%;top:42.0%;width:21.1%;height:48.0%"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // -----------------------
+  // TTS
+  // -----------------------
+  function speak(text){
+    try{
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "es-ES";
+      u.rate = 0.92;
+      u.pitch = 1.0;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+
+  // -----------------------
+  // DOM
+  // -----------------------
+  const chipEl = document.getElementById("chip");
+  const instrTextEl = document.getElementById("instrText");
+  const noteEl = document.getElementById("note");
+  const btnPlay = document.getElementById("btnPlay");
+  const btnContinue = document.getElementById("btnContinue");
+
+  const zInstituto = document.getElementById("zInstituto");
+  const zMar = document.getElementById("zMar");
+  const zOficinas = document.getElementById("zOficinas");
+
+  // -----------------------
+  // ACTIVACIÓN DE ZONAS
+  // REGLA: MAR y OFICINAS NUNCA SE SEÑALAN (solo clicables).
+  // INSTITUTO SIEMPRE VISIBLE (y solo en paso 1 es clicable + pulso).
+  // -----------------------
+  function disableAllClicks(){
+    zInstituto.style.pointerEvents = "none";
+    zInstituto.classList.remove("activeRef");
+
+    zMar.style.pointerEvents = "none";
+    zOficinas.style.pointerEvents = "none";
+  }
+
+  function setActiveTarget(target){
+    disableAllClicks();
+
+    if(target === "instituto"){
+      zInstituto.style.pointerEvents = "auto";
+      zInstituto.classList.add("activeRef"); // aquí sí lo marcamos más (pulso)
+    } else if(target === "mar"){
+      zMar.style.pointerEvents = "auto";      // invisible
+    } else if(target === "oficinas"){
+      zOficinas.style.pointerEvents = "auto"; // invisible
+    }
+  }
+
+  // -----------------------
+  // ESCENAS
+  // type:
+  // - "action": exige clic correcto (SIN CONTINUAR)
+  // - "praise": felicitación (CON CONTINUAR)
+  // -----------------------
+  const scenes = [
+    {
+      chip: "BARRIO · PASO 1",
+      type: "action",
+      active: "instituto",
+      text:
+`AHORA VEMOS EL BARRIO.
+EL INSTITUTO ESTÁ MARCADO EN ROJO.
+¿PUEDES HACER CLICK EN ÉL?`
+    },
+    {
+      chip: "BIEN",
+      type: "praise",
+      active: null,
+      text:
+`¡FELICIDADES! LO HAS HECHO BIEN.
+EXACTO. ESO ERA EL INSTITUTO.`
+    },
+    {
+      chip: "BARRIO · PASO 2",
+      type: "action",
+      active: "mar",
+      text:
+`AHORA BUSCA EL MAR.
+¿PUEDES SEÑALAR DÓNDE ESTÁ EL MAR?`
+    },
+    {
+      chip: "BIEN",
+      type: "praise",
+      active: null,
+      text:
+`¡FELICIDADES! LO HAS HECHO BIEN.
+ESO ERA EL MAR.`
+    },
+    {
+      chip: "BARRIO · PASO 3",
+      type: "action",
+      active: "oficinas",
+      text:
+`AHORA BUSCA LAS OFICINAS.
+DESDE TU CLASE VES DOS EDIFICIOS MUY ALTOS CERCA DEL MAR.
+¿PUEDES SEÑALAR DÓNDE ESTÁN EN EL MAPA?`
+    },
+    {
+      chip: "FINAL",
+      type: "praise",
+      active: null,
+      text:
+`¡FELICIDADES! LO HAS HECHO BIEN.
+HAS ENCONTRADO EL INSTITUTO, EL MAR Y LAS OFICINAS.`
+    }
+  ];
+
+  let idx = 0;
+  let currentText = scenes[0].text.toUpperCase();
+
+  function render(){
+    const s = scenes[idx];
+    chipEl.textContent = s.chip;
+    instrTextEl.textContent = s.text.toUpperCase();
+    currentText = s.text.toUpperCase();
+
+    if(s.type === "action"){
+      btnContinue.style.display = "none";
+      noteEl.textContent = "PULSA ▶ PLAY PARA ESCUCHAR. LUEGO HAZ CLICK EN EL MAPA.";
+      setActiveTarget(s.active);
+    } else {
+      btnContinue.style.display = "inline-block";
+      noteEl.textContent = "PULSA ▶ PLAY PARA ESCUCHAR. LUEGO PULSA CONTINUAR.";
+      disableAllClicks();
+      // OJO: el instituto sigue visible porque es un div sólido; solo desactivamos clic.
+    }
+  }
+
+  function next(){
+    idx = Math.min(idx + 1, scenes.length - 1);
+    render();
+  }
+
+  // -----------------------
+  // BOTONES
+  // -----------------------
+  btnPlay.addEventListener("click", () => speak(currentText));
+
+  btnContinue.addEventListener("click", () => {
+    if(scenes[idx].chip === "FINAL"){
+      // ✅ por defecto reinicia barrio.html
+      // (si quieres ir a otro sitio, cambia esta línea)
+      window.location.href = "barrio.html";
+      return;
+    }
+    next();
+  });
+
+  // -----------------------
+  // CLICS (solo cuando toca)
+  // -----------------------
+  function handleCorrectClick(name){
+    const s = scenes[idx];
+    if(s.type !== "action") return;
+    if(s.active !== name) return;
+    next(); // pasa a felicitación
+  }
+
+  zInstituto.addEventListener("click", () => handleCorrectClick("instituto"));
+  zMar.addEventListener("click", () => handleCorrectClick("mar"));
+  zOficinas.addEventListener("click", () => handleCorrectClick("oficinas"));
+
+  // START
+  render();
+})();
+</script>
+</body>
+</html>
