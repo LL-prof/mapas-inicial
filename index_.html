@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AULA · VISTA NORMAL Y VISTA DESDE ARRIBA</title>
+
+<style>
+  :root{
+    --bg:#0f172a;
+    --ink:#ffffff;
+    --muted:#cbd5e1;
+    --line:rgba(255,255,255,.14);
+    --shadow: 0 14px 40px rgba(0,0,0,.45);
+    --radius: 18px;
+    --green:#22c55e;
+    --red:#ef4444;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: radial-gradient(1200px 800px at 10% 10%, #1a2a6a 0%, var(--bg) 55%) fixed;
+    color: var(--ink);
+  }
+
+  .app{ max-width:1200px; margin:0 auto; padding:14px; }
+
+  /* RESPONSIVE LAYOUT */
+  .layout{
+    display:grid;
+    grid-template-columns:380px 1fr;
+    gap:14px;
+    align-items:start;
+  }
+  @media (max-width:920px){
+    .layout{ grid-template-columns:1fr; }
+  }
+
+  .card{
+    background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+
+  /* LEFT: INSTRUCTIONS */
+  .left{ padding:16px; }
+
+  .chip{
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.12);
+    color:var(--muted);
+    font-weight:900;
+    font-size:12px;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+
+  .title{
+    margin:0 0 10px;
+    font-size:18px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.4px;
+  }
+
+  #instrText{
+    margin:0 0 14px;
+    font-size:18px;
+    line-height:1.35;
+    font-weight:900;
+    letter-spacing:.3px;
+    text-transform:uppercase;
+    white-space:pre-line;
+  }
+
+  .note{
+    margin:0 0 12px;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.35;
+    text-transform:uppercase;
+    letter-spacing:.2px;
+    min-height: 18px;
+  }
+
+  .btnRow{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+
+  button{
+    border:0;
+    border-radius:14px;
+    padding:12px 14px;
+    font-weight:900;
+    cursor:pointer;
+    background:rgba(255,255,255,.10);
+    color:var(--ink);
+    text-transform:uppercase;
+    letter-spacing:.3px;
+  }
+  button:hover{ background:rgba(255,255,255,.14); }
+
+  button.primary{
+    background: rgba(34,197,94,.88);
+    color:#061f12;
+  }
+  button.primary:hover{ background: rgba(34,197,94,.98); }
+
+  button.yes{
+    background: rgba(255,255,255,.92);
+    color:#0b1224;
+  }
+  button.yes:hover{ background: rgba(255,255,255,.98); }
+
+  /* RIGHT: IMAGE AREA */
+  .right{ padding:14px; }
+  .imgWrap{ position:relative; width:100%; }
+
+  /* Crossfade images */
+  .sceneImg{
+    width:100%;
+    height:auto;
+    display:block;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.10);
+  }
+  #imgNormal, #imgMapa{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:auto;
+    opacity:1;
+    transition: opacity 800ms ease;
+  }
+  /* keep aspect by using the first image in normal flow */
+  #imgSizer{
+    position:relative;
+    width:100%;
+    display:block;
+    opacity:0; /* invisible but reserves space */
+    pointer-events:none;
+  }
+
+  /* Start: mapa hidden */
+  .mapHidden #imgMapa{ opacity:0; pointer-events:none; }
+  .mapHidden #imgNormal{ opacity:1; pointer-events:auto; }
+
+  /* After YES: normal fades out */
+  .mapShown #imgMapa{ opacity:1; pointer-events:auto; }
+  .mapShown #imgNormal{ opacity:0; pointer-events:none; }
+
+  /* HOTSPOTS (ONLY ACTIVE AFTER MAP SHOWN) */
+  .zona{
+    position:absolute;
+    border-radius:12px;
+    background: rgba(255,255,255,0.00); /* invisible */
+    pointer-events:none;
+  }
+
+  /* Just to help touch: cursor when active */
+  .zona.activeTarget{ pointer-events:auto; cursor:pointer; }
+
+  /* Optional tiny flash on correct click */
+  .flashOk{
+    outline: 4px solid var(--green);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgba(34,197,94,.25);
+  }
+</style>
+</head>
+
+<body>
+<div class="app">
+  <div class="layout">
+
+    <!-- LEFT PANEL -->
+    <section class="card left" aria-label="Instrucciones">
+      <div class="chip" id="chip">AULA · INICIO</div>
+      <h1 class="title">INSTRUCCIONES</h1>
+
+      <p id="instrText"></p>
+      <p class="note" id="note">PULSA ▶ PLAY PARA ESCUCHAR.</p>
+
+      <div class="btnRow">
+        <button id="btnPlay">▶ PLAY</button>
+        <button class="yes" id="btnYes" style="display:none;">¡SÍ!</button>
+        <button class="primary" id="btnContinue" style="display:none;">CONTINUAR</button>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL -->
+    <section class="card right" aria-label="Aula">
+      <div class="imgWrap mapHidden" id="wrap">
+
+        <!-- sizer keeps layout height -->
+        <img id="imgSizer" class="sceneImg" src="aula_normal.png" alt="" />
+
+        <!-- Normal view -->
+        <img id="imgNormal" class="sceneImg" src="aula_normal.png" alt="Aula vista normal" />
+
+        <!-- Map/top view -->
+        <img id="imgMapa" class="sceneImg" src="aula_mapa.png" alt="Aula vista desde arriba" />
+
+        <!-- HOTSPOTS (percentages from your 1-2-3-4 layout) -->
+        <!-- 1 (arriba izquierda) -->
+        <div class="zona" id="z1" data-z="1"
+             style="left:22.01%;top:31.05%;width:25.26%;height:22.07%"></div>
+
+        <!-- 2 (arriba derecha) -->
+        <div class="zona" id="z2" data-z="2"
+             style="left:52.28%;top:30.18%;width:24.35%;height:23.73%"></div>
+
+        <!-- 3 (abajo izquierda)  ✅ CORRECTA -->
+        <div class="zona" id="z3" data-z="3"
+             style="left:22.14%;top:58.79%;width:25.72%;height:26.86%"></div>
+
+        <!-- 4 (abajo derecha) -->
+        <div class="zona" id="z4" data-z="4"
+             style="left:51.63%;top:60.45%;width:26.50%;height:25.00%"></div>
+
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- TTS ----------
+  function speak(text){
+    try{
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "es-ES";
+      u.rate = 0.92;
+      u.pitch = 1.0;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+
+  // ---------- DOM ----------
+  const chipEl = document.getElementById("chip");
+  const instrEl = document.getElementById("instrText");
+  const noteEl = document.getElementById("note");
+  const btnPlay = document.getElementById("btnPlay");
+  const btnYes = document.getElementById("btnYes");
+  const btnContinue = document.getElementById("btnContinue");
+  const wrap = document.getElementById("wrap");
+
+  const zones = [
+    document.getElementById("z1"),
+    document.getElementById("z2"),
+    document.getElementById("z3"),
+    document.getElementById("z4"),
+  ];
+
+  let currentText = "";
+
+  function setText(text){
+    currentText = (text || "").toUpperCase();
+    instrEl.textContent = currentText;
+  }
+
+  btnPlay.addEventListener("click", () => speak(currentText));
+
+  // ---------- STATES ----------
+  // 0: intro (normal view) + YES
+  // 1: instruction (map view) click seat (correct=3)
+  // 2: praise + continue (go to institute)
+  let state = 0;
+
+  function disableZones(){
+    zones.forEach(z => {
+      z.classList.remove("activeTarget","flashOk");
+      z.style.pointerEvents = "none";
+    });
+  }
+
+  function enableZones(){
+    zones.forEach(z => {
+      z.classList.add("activeTarget");
+      z.style.pointerEvents = "auto";
+    });
+  }
+
+  function showIntro(){
+    state = 0;
+    chipEl.textContent = "AULA · INICIO";
+    setText(
+`¡MIRA! ESTA AULA SE PARECE A LA TUYA.
+LA PUERTA ESTÁ EN EL MISMO LUGAR QUE LA TUYA.
+LA PIZARRA TAMBIÉN.
+LA MESA DEL PROFESOR TAMBIÉN.
+Y LAS VENTANAS TAMBIÉN.
+PERO… ¿CÓMO SE VERÍA ESTA AULA DESDE ARRIBA?
+¿QUIERES VERLO?`
+    );
+    noteEl.textContent = "PULSA ▶ PLAY PARA ESCUCHAR. LUEGO PULSA ¡SÍ!";
+    btnYes.style.display = "inline-block";
+    btnContinue.style.display = "none";
+    disableZones();
+
+    wrap.classList.add("mapHidden");
+    wrap.classList.remove("mapShown");
+  }
+
+  function showMapAndAskSeat(){
+    state = 1;
+    chipEl.textContent = "AULA · PASO 1";
+    setText("HAZ CLICK DONDE TE SIENTAS TÚ AHORA EN LA CLASE.");
+    noteEl.textContent = "PULSA ▶ PLAY PARA ESCUCHAR. LUEGO HAZ CLICK EN EL MAPA.";
+    btnYes.style.display = "none";
+    btnContinue.style.display = "none";
+
+    wrap.classList.remove("mapHidden");
+    wrap.classList.add("mapShown");
+
+    enableZones();
+  }
+
+  function showPraise(){
+    state = 2;
+    chipEl.textContent = "BIEN";
+    setText(
+`¡FELICIDADES! LO HAS HECHO BIEN. ESE ES TU SITIO.
+AHORA VAMOS A VER TU INSTITUTO VISTO DESDE ARRIBA!`
+    );
+    noteEl.textContent = "PULSA ▶ PLAY PARA ESCUCHAR. LUEGO PULSA CONTINUAR.";
+    btnContinue.style.display = "inline-block";
+    btnYes.style.display = "none";
+    disableZones();
+  }
+
+  // ---------- EVENTS ----------
+  btnYes.addEventListener("click", () => {
+    showMapAndAskSeat();
+  });
+
+  btnContinue.addEventListener("click", () => {
+    // ✅ ve al instituto (cambia el nombre si tu archivo es otro)
+    window.location.href = "instituto.html";
+  });
+
+  zones.forEach(z => {
+    z.addEventListener("click", () => {
+      if(state !== 1) return;
+
+      const chosen = z.dataset.z;
+      if(chosen === "3"){
+        z.classList.add("flashOk");
+        showPraise();
+      }else{
+        noteEl.textContent = "NO. PRUEBA OTRA VEZ.";
+        speak("NO. PRUEBA OTRA VEZ.");
+      }
+    });
+  });
+
+  // START
+  showIntro();
+})();
+</script>
+</body>
+</html>
